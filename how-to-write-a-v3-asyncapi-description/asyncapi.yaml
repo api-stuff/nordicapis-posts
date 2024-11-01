@@ -1,0 +1,778 @@
+asyncapi: 3.0.0
+info:
+  title: Patient Medication Request Service
+  version: 1.0.0
+  description: >-
+    This AsyncAPI description provides a service for ordering patient medication
+    based
+
+    on the Fast Healthcare Interoperability Resources (FHIR). Please note this
+    **does not**
+
+    implement the full message payloads as these are far too large for walking
+    through
+
+    implementing use cases in a blog post. We use this example for guidance on a
+    real world use
+
+    case.
+  license:
+    name: CC BY-NC-SA
+    url: https://creativecommons.org/licenses/by-nc-sa/4.0/
+defaultContentType: application/json
+channels:
+  patientMedicationStatements:
+    description: Channel for requesting patient record and medication statement
+    address: health.patient.medication.statement
+    messages:
+      patientMedicationStatementRequest:
+        $ref: '#/components/messages/patientMedicationStatementRequest'
+      patientMedicationStatementResponse:
+        $ref: '#/components/messages/patientMedicationStatementResponse'
+  patientMedicationRequest:
+    description: Channel for ordering medication for a patient
+    address: health.patient.medication.request
+    messages:
+      patientMedicationRequest:
+        $ref: '#/components/messages/patientMedicationRequest'
+      patientMedicationResponse:
+        $ref: '#/components/messages/patientMedicationResponse'
+operations:
+  order-medication/get-patient-and-medication-statement:
+    summary: Retrieve the patient record and current medication for the patient
+    action: send
+    channel:
+      $ref: '#/channels/patientMedicationStatements'
+    messages:
+      - $ref: >-
+          #/channels/patientMedicationStatements/messages/patientMedicationStatementRequest
+    reply:
+      address:
+        location: $message.header#/replyTo
+      channel:
+        $ref: '#/channels/patientMedicationRequest'
+      messages:
+        - $ref: >-
+            #/channels/patientMedicationRequest/messages/patientMedicationResponse
+  order-medication/make-medication-request:
+    summary: Send a medication request on-behalf of the patient
+    action: send
+    channel:
+      $ref: '#/channels/patientMedicationRequest'
+    messages:
+      - $ref: '#/channels/patientMedicationRequest/messages/patientMedicationRequest'
+    reply:
+      address:
+        location: $message.header#/replyTo
+      channel:
+        $ref: '#/channels/patientMedicationRequest'
+      messages:
+        - $ref: >-
+            #/channels/patientMedicationRequest/messages/patientMedicationResponse
+components:
+  messages:
+    patientMedicationStatementRequest:
+      summary: Request message for patient and current medication data
+      title: Patient and Medication Request
+      payload:
+        $ref: '#/components/schemas/patientMedicationStatementRequestPayload'
+      traits:
+        - $ref: '#/components/messageTraits/healthSystemHeaders'
+    patientMedicationStatementResponse:
+      summary: Response message for patient and current medication data
+      title: Patient and Medication Response
+      payload:
+        $ref: '#/components/schemas/patientMedicationStatementRequestPayload'
+      traits:
+        - $ref: '#/components/messageTraits/healthSystemHeaders'
+    patientMedicationRequest:
+      summary: Request message for patient and current medication data
+      title: Patient and Medication Request
+      payload:
+        $ref: '#/components/schemas/patientMedicationStatementRequestPayload'
+      traits:
+        - $ref: '#/components/messageTraits/healthSystemHeaders'
+    patientMedicationResponse:
+      summary: Request message for patient and current medication data
+      title: Patient and Medication Request
+      payload:
+        $ref: '#/components/schemas/patientMedicationStatementRequestPayload'
+      traits:
+        - $ref: '#/components/messageTraits/healthSystemHeaders'
+  schemas:
+    patientMedicationStatementRequestPayload:
+      type: object
+      properties:
+        resourceType:
+          type: string
+          enum:
+            - Bundle
+        type:
+          type: string
+          enum:
+            - message
+        entry:
+          type: array
+          items:
+            type: object
+            properties:
+              resource:
+                type: object
+                oneOf:
+                  - properties:
+                      resourceType:
+                        type: string
+                        enum:
+                          - MessageHeader
+                      eventCoding:
+                        type: object
+                        properties:
+                          system:
+                            type: string
+                            format: uri
+                          code:
+                            type: string
+                        required:
+                          - system
+                          - code
+                      source:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          endpoint:
+                            type: string
+                            format: uri
+                        required:
+                          - name
+                          - endpoint
+                      destination:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            endpoint:
+                              type: string
+                              format: uri
+                          required:
+                            - name
+                            - endpoint
+                      focus:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            reference:
+                              type: string
+                          required:
+                            - reference
+                    required:
+                      - resourceType
+                      - eventCoding
+                      - source
+                      - destination
+                      - focus
+                  - properties:
+                      resourceType:
+                        type: string
+                        enum:
+                          - Patient
+                      id:
+                        type: string
+                      identifier:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            system:
+                              type: string
+                              format: uri
+                            value:
+                              type: string
+                          required:
+                            - system
+                            - value
+                    required:
+                      - resourceType
+                      - id
+                      - identifier
+                  - properties:
+                      resourceType:
+                        type: string
+                        enum:
+                          - MedicationStatement
+                      status:
+                        type: string
+                        enum:
+                          - active
+                          - completed
+                          - entered-in-error
+                          - intended
+                          - stopped
+                          - on-hold
+                      medicationCodeableConcept:
+                        type: object
+                        properties:
+                          coding:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                system:
+                                  type: string
+                                  format: uri
+                                code:
+                                  type: string
+                                display:
+                                  type: string
+                              required:
+                                - system
+                                - code
+                      subject:
+                        type: object
+                        properties:
+                          reference:
+                            type: string
+                          display:
+                            type: string
+                        required:
+                          - reference
+                      effectiveDateTime:
+                        type: string
+                        format: date-time
+                      dateAsserted:
+                        type: string
+                        format: date-time
+                      taken:
+                        type: string
+                        enum:
+                          - 'y'
+                          - 'n'
+                          - unk
+                          - na
+                      reasonCode:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            coding:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  system:
+                                    type: string
+                                    format: uri
+                                  code:
+                                    type: string
+                                  display:
+                                    type: string
+                                required:
+                                  - system
+                                  - code
+                    required:
+                      - resourceType
+                      - status
+                      - medicationCodeableConcept
+                      - subject
+                      - effectiveDateTime
+                      - taken
+            required:
+              - resource
+          minItems: 2
+      required:
+        - resourceType
+        - type
+        - entry
+    patientMedicationStatementResponsePayload:
+      type: object
+      properties:
+        resourceType:
+          type: string
+          enum:
+            - Bundle
+        type:
+          type: string
+          enum:
+            - message
+        entry:
+          type: array
+          items:
+            type: object
+            properties:
+              resource:
+                type: object
+                oneOf:
+                  - properties:
+                      resourceType:
+                        type: string
+                        enum:
+                          - MessageHeader
+                      eventCoding:
+                        type: object
+                        properties:
+                          system:
+                            type: string
+                            format: uri
+                          code:
+                            type: string
+                        required:
+                          - system
+                          - code
+                      source:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          endpoint:
+                            type: string
+                            format: uri
+                        required:
+                          - name
+                          - endpoint
+                      destination:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            endpoint:
+                              type: string
+                              format: uri
+                          required:
+                            - name
+                            - endpoint
+                      focus:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            reference:
+                              type: string
+                          required:
+                            - reference
+                    required:
+                      - resourceType
+                      - eventCoding
+                      - source
+                      - destination
+                      - focus
+                  - properties:
+                      resourceType:
+                        type: string
+                        enum:
+                          - Patient
+                      id:
+                        type: string
+                      identifier:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            system:
+                              type: string
+                              format: uri
+                            value:
+                              type: string
+                          required:
+                            - system
+                            - value
+                    required:
+                      - resourceType
+                      - id
+                      - identifier
+                  - properties:
+                      resourceType:
+                        type: string
+                        enum:
+                          - MedicationStatement
+                      status:
+                        type: string
+                        enum:
+                          - active
+                          - completed
+                          - entered-in-error
+                          - intended
+                          - stopped
+                          - on-hold
+                      medicationCodeableConcept:
+                        type: object
+                        properties:
+                          coding:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                system:
+                                  type: string
+                                  format: uri
+                                code:
+                                  type: string
+                                display:
+                                  type: string
+                              required:
+                                - system
+                                - code
+                      subject:
+                        type: object
+                        properties:
+                          reference:
+                            type: string
+                          display:
+                            type: string
+                        required:
+                          - reference
+                      effectiveDateTime:
+                        type: string
+                        format: date-time
+                      dateAsserted:
+                        type: string
+                        format: date-time
+                      taken:
+                        type: string
+                        enum:
+                          - 'y'
+                          - 'n'
+                          - unk
+                          - na
+                      reasonCode:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            coding:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  system:
+                                    type: string
+                                    format: uri
+                                  code:
+                                    type: string
+                                  display:
+                                    type: string
+                                required:
+                                  - system
+                                  - code
+                    required:
+                      - resourceType
+                      - status
+                      - medicationCodeableConcept
+                      - subject
+                      - effectiveDateTime
+                      - taken
+            required:
+              - resource
+          minItems: 2
+      required:
+        - resourceType
+        - type
+        - entry
+    medicationRequestPayload:
+      type: object
+      properties:
+        resourceType:
+          type: string
+          enum:
+            - Bundle
+        type:
+          type: string
+          enum:
+            - message
+        entry:
+          type: array
+          items:
+            type: object
+            properties:
+              resource:
+                type: object
+                oneOf:
+                  - properties:
+                      resourceType:
+                        type: string
+                        enum:
+                          - MessageHeader
+                      eventCoding:
+                        type: object
+                        properties:
+                          system:
+                            type: string
+                            format: uri
+                          code:
+                            type: string
+                        required:
+                          - system
+                          - code
+                      source:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          endpoint:
+                            type: string
+                            format: uri
+                        required:
+                          - name
+                          - endpoint
+                      destination:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            endpoint:
+                              type: string
+                              format: uri
+                          required:
+                            - name
+                            - endpoint
+                    required:
+                      - resourceType
+                      - eventCoding
+                      - source
+                      - destination
+                  - properties:
+                      resourceType:
+                        type: string
+                        enum:
+                          - MedicationRequest
+                      status:
+                        type: string
+                        enum:
+                          - draft
+                          - active
+                      intent:
+                        type: string
+                        enum:
+                          - order
+                      medicationCodeableConcept:
+                        type: object
+                        properties:
+                          coding:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                system:
+                                  type: string
+                                  format: uri
+                                code:
+                                  type: string
+                                display:
+                                  type: string
+                              required:
+                                - system
+                                - code
+                      subject:
+                        type: object
+                        properties:
+                          reference:
+                            type: string
+                          display:
+                            type: string
+                        required:
+                          - reference
+                      authoredOn:
+                        type: string
+                        format: date-time
+                      requester:
+                        type: object
+                        properties:
+                          reference:
+                            type: string
+                          display:
+                            type: string
+                      dosageInstruction:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            text:
+                              type: string
+                            timing:
+                              type: object
+                              properties:
+                                repeat:
+                                  type: object
+                                  properties:
+                                    frequency:
+                                      type: integer
+                                    period:
+                                      type: number
+                                    periodUnit:
+                                      type: string
+                                      enum:
+                                        - d
+                                        - h
+                                        - min
+                            route:
+                              type: string
+                    required:
+                      - resourceType
+                      - status
+                      - intent
+                      - medicationCodeableConcept
+                      - subject
+                      - authoredOn
+            required:
+              - resource
+          minItems: 2
+      required:
+        - resourceType
+        - type
+        - entry
+    medicationResponsePayload:
+      type: object
+      properties:
+        resourceType:
+          type: string
+          enum:
+            - Bundle
+        type:
+          type: string
+          enum:
+            - searchset
+        total:
+          type: integer
+        entry:
+          type: array
+          items:
+            type: object
+            properties:
+              resource:
+                type: object
+                oneOf:
+                  - properties:
+                      resourceType:
+                        type: string
+                        enum:
+                          - MedicationRequest
+                      id:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                          - active
+                          - on-hold
+                          - cancelled
+                          - completed
+                          - entered-in-error
+                          - stopped
+                          - draft
+                      intent:
+                        type: string
+                        enum:
+                          - proposal
+                          - plan
+                          - order
+                          - instance-order
+                          - option
+                      medicationCodeableConcept:
+                        type: object
+                        properties:
+                          coding:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                system:
+                                  type: string
+                                  format: uri
+                                code:
+                                  type: string
+                                display:
+                                  type: string
+                              required:
+                                - system
+                                - code
+                        required:
+                          - coding
+                      subject:
+                        type: object
+                        properties:
+                          reference:
+                            type: string
+                          display:
+                            type: string
+                        required:
+                          - reference
+                      authoredOn:
+                        type: string
+                        format: date-time
+                      requester:
+                        type: object
+                        properties:
+                          reference:
+                            type: string
+                          display:
+                            type: string
+                        required:
+                          - reference
+                      dosageInstruction:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            text:
+                              type: string
+                            timing:
+                              type: object
+                              properties:
+                                repeat:
+                                  type: object
+                                  properties:
+                                    frequency:
+                                      type: integer
+                                    period:
+                                      type: integer
+                                    periodUnit:
+                                      type: string
+                                  required:
+                                    - frequency
+                                    - period
+                                    - periodUnit
+                            route:
+                              type: string
+                          required:
+                            - text
+                            - timing
+                            - route
+                      note:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            text:
+                              type: string
+                    required:
+                      - resourceType
+                      - id
+                      - status
+                      - intent
+                      - medicationCodeableConcept
+                      - subject
+                      - authoredOn
+                      - requester
+                      - dosageInstruction
+            required:
+              - resource
+          minItems: 1
+      required:
+        - resourceType
+        - type
+        - entry
+  messageTraits:
+    healthSystemHeaders:
+      headers:
+        type: object
+        properties:
+          health-system-id:
+            description: Health system provider ID as UUID
+            type: string
+            pattern: >-
+              ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$
